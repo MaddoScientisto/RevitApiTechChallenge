@@ -1,0 +1,6 @@
+{
+  "Forge": {
+    "ClientId": "<<client ID here>",
+    "ClientSecret": "<<client secret here>>"
+  }
+}
