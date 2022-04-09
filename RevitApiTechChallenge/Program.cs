@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -20,11 +21,56 @@ namespace RevitApiTechChallenge
 
             var service = ActivatorUtilities.GetServiceOrCreateInstance<IForgeService>(host.Services);
 
-            await service.TriggerJob(new string[] { "E:\\racbasicsampleproject.rvt" }, "2018", "http");
+            var files = new List<string>();
+            bool doneAddingFiles = false;
+            while (!doneAddingFiles)
+            {
+                var file = AnsiConsole.Ask<string>("Insert file path:");
+                if (!string.IsNullOrWhiteSpace(file))
+                {
+                    files.Add(file);
 
-            // code here
+                    if (!AnsiConsole.Confirm("Add more files?"))
+                    {
+                        doneAddingFiles = true;
+                    }
+                }
+                else
+                {
+                    if (!AnsiConsole.Confirm("Invalid string, try again?"))
+                    {
+                        doneAddingFiles = true;
+                    }
+                }
+            }
 
-            //service.Connect();
+            var v = AnsiConsole.Prompt(
+                new TextPrompt<int>("Insert the target version:")
+                .PromptStyle("green")
+                .ValidationErrorMessage("[red]invalid input")
+                .Validate(ver =>
+                {
+                    return ver switch
+                    {
+                        < 2009 => ValidationResult.Error("[red] version too low"),
+                        > 2022 => ValidationResult.Error("[red] version too high"),
+                        _ => ValidationResult.Success()
+                    };
+                }));
+
+
+            var url = AnsiConsole.Ask<string>("Insert the target url: ");
+
+            AnsiConsole.WriteLine("Starting processing...");
+            var result = await service.TriggerJob(files.ToArray(), v.ToString(), url);
+
+            if (!result.Success)
+            {
+                AnsiConsole.WriteLine("There was an error:");
+                AnsiConsole.WriteLine(result.Error);
+            }
+
+            
         }
 
         static IHost AppStartup()
@@ -60,7 +106,7 @@ namespace RevitApiTechChallenge
             // We add env variables, which can override the configs in appsettings.json
             builder.SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .AddJsonFile("forgesettings.json", optional: false, reloadOnChange: true)
+                //.AddJsonFile("forgesettings.json", optional: false, reloadOnChange: true)
                 .AddEnvironmentVariables();
         }
 

@@ -28,14 +28,9 @@ namespace RevitApiTechChallenge.Services.Impl
 
         public async Task<ForgeResult> TriggerJob(string[] paths, string targetVersion, string outputUrl)
         {
-            var forgeConfigSection = _config.GetSection("Forge");
-            if (forgeConfigSection == null) return new ForgeResult()
-            {
-                Success = false,
-                Error = "No config specified for the app client and secret"
-            };
-            string clientId = forgeConfigSection["ClientId"];
-            string clientSecret = forgeConfigSection["ClientSecret"];
+           
+            string clientId = _config["Forge:ClientId"];
+            string clientSecret = _config["Forge:ClientSecret"];
             if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret)) return new ForgeResult()
             {
                 Success = false,
