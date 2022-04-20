@@ -19,7 +19,10 @@ namespace RevitApiTechChallenge.Services.Impl
         private readonly ILogger<ForgeService> _logger;
         private readonly IConfiguration _config;
 
-
+        private readonly string _baseUrl = "https://developer.api.autodesk.com";
+        private readonly string _authPath = "/authentication/v1/authenticate";
+        private readonly string _bucketsPath = "/oss/v2/buckets";
+        private readonly string _daPath = "/da/us-east/v3/workitems";
         public ForgeService(ILogger<ForgeService> logger, IConfiguration config)
         {
             _logger = logger;
@@ -28,52 +31,12 @@ namespace RevitApiTechChallenge.Services.Impl
 
         public async Task<ForgeResult> TriggerJob(string[] paths, string targetVersion, string outputUrl)
         {
-           
-            string clientId = _config["Forge:ClientId"];
-            string clientSecret = _config["Forge:ClientSecret"];
-            if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret)) return new ForgeResult()
+            var tokenResult = await GetToken();
+            if (!tokenResult.Success)
             {
-                Success = false,
-                Error = "No keys for the app client secret"
-            };
-
-            var baseUrl = "https://developer.api.autodesk.com";
-            var authPath = "/authentication/v1/authenticate";
-            var bucketsPath = "/oss/v2/buckets";
-            var daPath = "/da/us-east/v3/workitems";
-            string token = "";
-
-            // Get auth token
-            using (var client = new HttpClient())
-            {
-
-                var data = new Dictionary<string, string>()
-                {
-                    { "client_id", clientId},
-                    { "client_secret", clientSecret},
-                    { "grant_type", "client_credentials" },
-                    { "scope", "bucket:read bucket:create data:write data:create code:all" }
-
-                };
-
-                var response = await client.PostAsync(String.Concat(baseUrl, authPath), new FormUrlEncodedContent(data));
-                if (!response.IsSuccessStatusCode)
-                {
-                    string res = await response.Content.ReadAsStringAsync();
-                    return new ForgeResult()
-                    {
-                        Success = false,
-                        Error = $"{response.StatusCode} {res}"
-                    };
-
-
-                }
-                response.EnsureSuccessStatusCode();
-                var jsonResponse = await response.Content.ReadAsStringAsync();
-                dynamic content = JsonSerializer.Deserialize<ExpandoObject>(jsonResponse);
-                token = Convert.ToString(content.access_token);
-
+                return new ForgeResult() { Error = tokenResult.Error, Success = false };
             }
+            string token = tokenResult.Token;
 
             string bucketKey = "revitapitechchallenge";
 
@@ -93,7 +56,7 @@ namespace RevitApiTechChallenge.Services.Impl
 
                 var requestContent = new StringContent(dataJson, Encoding.UTF8, "application/json");
 
-                var response = await client.PostAsync(String.Concat(baseUrl, bucketsPath), requestContent);
+                var response = await client.PostAsync(String.Concat(_baseUrl, _bucketsPath), requestContent);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -147,7 +110,7 @@ namespace RevitApiTechChallenge.Services.Impl
                     
                     client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);                    
 
-                    var response = await client.PutAsync(string.Concat(baseUrl, bucketsPath, "/", bucketKey, "/objects/", fileName), fileContent);
+                    var response = await client.PutAsync(string.Concat(_baseUrl, _bucketsPath, "/", bucketKey, "/objects/", fileName), fileContent);
                     if (!response.IsSuccessStatusCode)
                     {
                         string res = await response.Content.ReadAsStringAsync();
@@ -227,7 +190,7 @@ namespace RevitApiTechChallenge.Services.Impl
                     }
                 };
 
-                var response = await client.PostAsync(string.Concat(baseUrl, daPath), new StringContent(JsonSerializer.Serialize(bodyData), Encoding.UTF8, "application/json"));
+                var response = await client.PostAsync(string.Concat(_baseUrl, _daPath), new StringContent(JsonSerializer.Serialize(bodyData), Encoding.UTF8, "application/json"));
                 if (!response.IsSuccessStatusCode)
                 {
                     string res = await response.Content.ReadAsStringAsync();
@@ -249,6 +212,55 @@ namespace RevitApiTechChallenge.Services.Impl
             }
 
         }
+
+        public async Task<TokenResult> GetToken()
+        {
+            string clientId = _config["Forge:ClientId"];
+            string clientSecret = _config["Forge:ClientSecret"];
+            if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret)) return new TokenResult()
+            {
+                Success = false,
+                Error = "No keys for the app client secret"
+            };
+
+            string token = string.Empty;
+
+            // Get auth token
+            using (var client = new HttpClient())
+            {
+                var data = new Dictionary<string, string>()
+                {
+                    { "client_id", clientId},
+                    { "client_secret", clientSecret},
+                    { "grant_type", "client_credentials" },
+                    { "scope", "bucket:read bucket:create data:write data:create code:all" }
+
+                };
+
+                var response = await client.PostAsync(String.Concat(_baseUrl, _authPath), new FormUrlEncodedContent(data));
+                if (!response.IsSuccessStatusCode)
+                {
+                    string res = await response.Content.ReadAsStringAsync();
+                    return new TokenResult()
+                    {
+                        Success = false,
+                        Error = $"{response.StatusCode} {res}"
+                    };
+                }
+                response.EnsureSuccessStatusCode();
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                dynamic content = JsonSerializer.Deserialize<ExpandoObject>(jsonResponse);
+                token = Convert.ToString(content.access_token);
+
+                return new TokenResult()
+                {
+                    Success = true,
+                    Token = token
+                };
+            }
+        }
+
+        
       
 
     }

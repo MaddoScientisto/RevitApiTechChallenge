@@ -12,4 +12,11 @@ namespace RevitApiTechChallenge.Data
         public string Urn { get; set; }
         public string Error { get; set; }
     }
+
+    public class TokenResult
+    {
+        public bool Success { get; set; }
+        public string Token { get; set; }
+        public string Error { get; set; }
+    }
 }
